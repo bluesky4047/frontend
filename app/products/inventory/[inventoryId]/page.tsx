@@ -1,4 +1,5 @@
-import { mockProducts } from '@/lib/mockData';
+// app/products/inventory/[inventoryId]/page.tsx
+
 import ProductCard from '@/components/ProductCard';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Package } from 'lucide-react';
@@ -10,8 +11,13 @@ interface InventoryProductsPageProps {
   };
 }
 
-export default function InventoryProductsPage({ params }: InventoryProductsPageProps) {
-  const products = mockProducts.filter(p => p.inventoryId === params.inventoryId);
+// Halaman utama
+export default async function InventoryProductsPage({ params }: InventoryProductsPageProps) {
+  const res = await fetch('https://api-mern-simpleecommerce.idkoding.com/api/products', {
+    cache: 'no-store', // agar data tidak di-cache saat develop
+  });
+  const json = await res.json();
+  const products = json.data.filter((p: any) => p.inventoryId === params.inventoryId);
 
   return (
     <div className="space-y-6">
@@ -36,9 +42,7 @@ export default function InventoryProductsPage({ params }: InventoryProductsPageP
           <Package className="h-8 w-8 text-blue-600" />
           <h1 className="text-3xl font-bold text-gray-900">Products from {params.inventoryId}</h1>
         </div>
-        <p className="text-gray-600">
-          {products.length} products found in this inventory
-        </p>
+        <p className="text-gray-600">{products.length} products found in this inventory</p>
       </div>
 
       {products.length === 0 ? (
@@ -49,11 +53,23 @@ export default function InventoryProductsPage({ params }: InventoryProductsPageP
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {products.map((product) => (
+          {products.map((product: any) => (
             <ProductCard key={product.id} product={product} />
           ))}
         </div>
       )}
     </div>
   );
+}
+
+// Generate semua parameter untuk pre-render saat export
+export async function generateStaticParams() {
+  const res = await fetch('https://api-mern-simpleecommerce.idkoding.com/api/products');
+  const json = await res.json();
+
+  const inventoryIds = new Set(json.data.map((product: any) => product.inventoryId));
+
+  return Array.from(inventoryIds).map((id) => ({
+    inventoryId: id,
+  }));
 }
