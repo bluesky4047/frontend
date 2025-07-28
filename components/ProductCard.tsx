@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { ShoppingCart, Eye } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { getFullImageUrl } from '@/lib/utils';
 
 interface ProductCardProps {
   product: Product;
@@ -28,7 +29,7 @@ export default function ProductCard({ product }: ProductCardProps) {
       <CardHeader className="p-0">
         <div className="relative overflow-hidden rounded-t-lg">
           <Image
-            src={product.image}
+            src={getFullImageUrl(product.image)}
             alt={product.name}
             width={400}
             height={250}
