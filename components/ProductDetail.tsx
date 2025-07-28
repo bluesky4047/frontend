@@ -31,6 +31,8 @@ export default function ProductDetail({ product }: ProductDetailProps) {
     });
   };
 
+  const cleanedImage = product.image.replace('http://127.0.0.1:5025', '');
+
   return (
     <div className="space-y-6">
       <div className="flex items-center space-x-4">
@@ -51,7 +53,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
         <div className="space-y-4">
           <div className="relative aspect-square rounded-lg overflow-hidden">
             <Image
-              src={product.image}
+              src={`https://api-mern-simpleecommerce.idkoding.com${cleanedImage}`}
               alt={product.name}
               fill
               className="object-cover"
