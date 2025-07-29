@@ -49,7 +49,7 @@ export default async function InventoryProductsPage({ params }: InventoryProduct
         <div className="text-center py-12">
           <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 mb-2">No products found</h3>
-          <p className="text-gray-600">This inventory doesn't have any products yet.</p>
+          <p className="text-gray-600">This inventory doesn&apos;t have any products yet.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

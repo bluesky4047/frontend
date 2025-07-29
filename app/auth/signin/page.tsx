@@ -8,8 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mail, Lock, Eye, EyeOff, Package } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function SignInPage() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -20,34 +22,55 @@ export default function SignInPage() {
     setIsLoading(true);
     
     try {
-      const response = await api.post('/auth/login', { email, password }); // ⬅️ ganti dengan endpoint server kamu
+      const response = await api.post('/auth/login', { email, password });
       const { success, message, data } = response.data;
 
       if (success) {
-        const { userId, email, token } = data;
+        const { userId, email: userEmail, token } = data;
 
         // Simpan token ke localStorage
         localStorage.setItem('token', token);
 
-        // Tampilkan data ke console
+        // PERBAIKAN: Simpan juga data user ke localStorage
+        const userData = {
+          id: userId,
+          email: userEmail,
+          name: userEmail.split('@')[0], // Ambil nama dari email (sebelum @)
+          phone: "081234567890" // Default phone untuk testing
+          // Jika API mengembalikan name, gunakan: name: data.name || userEmail.split('@')[0]
+        };
+        
+        localStorage.setItem('user', JSON.stringify(userData));
+
+        // Tampilkan data ke console untuk debugging
+        console.log('Login successful!');
         console.log('User ID:', userId);
-        console.log('Email:', email);
+        console.log('Email:', userEmail);
         console.log('Token:', token);
+        console.log('User data saved:', userData);
 
         alert('Login berhasil!');
-        // Optional: redirect ke halaman dashboard
+        
+        // Redirect ke homepage
+        router.push('/');
       } else {
         alert(`Login gagal: ${message}`);
       }
     } catch (error: any) {
       console.error('Login error:', error);
-      alert('Terjadi kesalahan saat login.');
+      
+      // Better error handling
+      if (error.response?.status === 401) {
+        alert('Email atau password salah!');
+      } else if (error.response?.status === 400) {
+        alert('Data login tidak valid!');
+      } else {
+        alert('Terjadi kesalahan saat login. Silakan coba lagi.');
+      }
     } finally {
       setIsLoading(false);
     }
-    };
-
-  
+  };
 
   return (
     <div className="min-h-screen bg-white flex items-center justify-center p-4">
@@ -152,7 +175,7 @@ export default function SignInPage() {
 
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">
-                Don't have an account?{' '}
+                Don&apos;t have an account?{' '}
                 <Link
                   href="/auth/register"
                   className="text-blue-600 hover:text-blue-800 font-medium transition-colors"
