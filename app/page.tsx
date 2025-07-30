@@ -1,85 +1,53 @@
 'use client';
-import api from '@/lib/api';
+
 import { useEffect, useState } from 'react';
+import api from '@/lib/api';
 import ProductCard from '@/components/ProductCard';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search } from 'lucide-react';
 
 export default function Home() {
   const [products, setProducts] = useState([]);
-  const [allProducts, setAllProducts] = useState([]);
   const [inventories, setInventories] = useState([]);
   const [selectedInventory, setSelectedInventory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  // Ambil data inventory
+  // Fetch products
   useEffect(() => {
-    const fetchInventories = async () => {
+    const fetchData = async () => {
       try {
-        const res = await api.get('/inventory');
-        setInventories(res.data.data);
-      } catch (err) {
-        console.error('Gagal mengambil inventory:', err);
+        const [productRes, inventoryRes] = await Promise.all([
+          api.get('/products'),
+          api.get('/inventory'),
+        ]);
+
+        setProducts(productRes.data.data);
+        setInventories(inventoryRes.data.data);
+      } catch (err: any) {
+        console.error(err);
+        setError('Gagal memuat data produk atau inventory');
+      } finally {
+        setLoading(false);
       }
     };
-    fetchInventories();
+
+    fetchData();
   }, []);
 
-  // Ambil semua produk lalu simpan sebagai allProducts
-  const fetchProducts = async () => {
-    try {
-      setLoading(true);
-      const res = await api.get('/products');
-      const data = res.data.data;
-      setAllProducts(data);
-    } catch (err) {
-      console.error('Gagal mengambil produk:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Filtered product
+  const filteredProducts = products.filter((item: any) => {
+    const matchesInventory =
+      selectedInventory === 'all' || item.inventoryId === selectedInventory;
 
-  // Load awal
-  useEffect(() => {
-    fetchProducts();
-  }, []);
+    const matchesSearch =
+      item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.description?.toLowerCase().includes(searchTerm.toLowerCase());
 
-  // Lakukan filter dan search di frontend
-  useEffect(() => {
-    let filtered = [...allProducts];
-
-    if (selectedInventory !== 'all') {
-      filtered = filtered.filter(
-        (item: any) => item.inventory_id === selectedInventory
-      );
-    }
-
-    if (searchTerm.trim() !== '') {
-      filtered = filtered.filter(
-        (item: any) =>
-          item.nama_produk?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.deskripsi_barang?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    setProducts(filtered);
-  }, [allProducts, selectedInventory, searchTerm]);
-
-  const handleInventoryChange = (value: string) => {
-    setSelectedInventory(value);
-  };
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value);
-  };
+    return matchesInventory && matchesSearch;
+  });
 
   return (
     <div className="space-y-8">
@@ -90,21 +58,21 @@ export default function Home() {
         </p>
       </div>
 
-      {/* FILTER */}
+      {/* FILTERS */}
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
-            placeholder="Search products..."
+            placeholder="Cari produk..."
             className="pl-10"
             value={searchTerm}
-            onChange={handleSearchChange}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
 
-        <div className="flex gap-2">
-          <Select value={selectedInventory} onValueChange={handleInventoryChange}>
-            <SelectTrigger className="w-[180px]">
+        <div className="w-[180px]">
+          <Select value={selectedInventory} onValueChange={setSelectedInventory}>
+            <SelectTrigger>
               <SelectValue placeholder="Pilih Inventory" />
             </SelectTrigger>
             <SelectContent>
@@ -119,20 +87,22 @@ export default function Home() {
         </div>
       </div>
 
-      {/* PRODUK */}
+      {/* HASIL */}
       {loading ? (
         <div className="text-center text-gray-500">Loading products...</div>
-      ) : (
+      ) : error ? (
+        <div className="text-center text-red-500">{error}</div>
+      ) : filteredProducts.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {products.length > 0 ? (
-            products.map((product: any) => (
-              <ProductCard key={product.id} product={product} />
-            ))
-          ) : (
-            <div className="text-center col-span-full text-gray-400">
-              Produk tidak ditemukan
-            </div>
-          )}
+          {filteredProducts.map((product: any) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center text-gray-400 py-12">
+          <Search className="h-10 w-10 mx-auto mb-4" />
+          <p className="text-lg font-semibold">Produk tidak ditemukan</p>
+          <p className="text-sm text-gray-500">Coba gunakan kata kunci lain atau ubah filter inventory.</p>
         </div>
       )}
     </div>
