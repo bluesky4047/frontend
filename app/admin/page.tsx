@@ -83,94 +83,90 @@ export default function AdminCRUDPage() {
     }
   }, [token, fetchAll]);
 
-  // Upload image to your API endpoint
+  useEffect(() => {
+    console.log('Inventories:', inventories);
+  }, [inventories]);
+
   const uploadImage = async (file: File): Promise<string> => {
-    // Compress image before upload if it's too large
     const compressedFile = await compressImage(file);
-    
+
     const formData = new FormData();
     formData.append('image', compressedFile);
-    
+
     console.log('Uploading compressed file:', {
       name: compressedFile.name,
       size: compressedFile.size,
       type: compressedFile.type,
-      originalSize: file.size
+      originalSize: file.size,
     });
-    
+
     try {
-      // Try direct upload to products endpoint (most likely correct one)
-      const response = await fetch('https://api-mern-simpleecommerce.idkoding.com/api/products', {
+      const uploadEndpoint = 'https://api-mern-simpleecommerce.idkoding.com/api/upload';
+      const response = await fetch(uploadEndpoint, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
-          // Don't set Content-Type header, let browser set it with boundary for FormData
         },
         body: formData,
       });
-      
+
       console.log('Upload response status:', response.status);
       console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-      
+
       const contentType = response.headers.get('content-type');
-      
+
       if (response.ok && contentType && contentType.includes('application/json')) {
         const data = await response.json();
         console.log('Upload successful, response data:', data);
-        
-        // Based on your ProductCard reference, the API likely returns a path like '/uploads/filename.jpg'
-        const imagePath = data.data?.image || 
-                         data.image || 
-                         data.data?.imagePath || 
-                         data.imagePath ||
-                         data.data?.path || 
-                         data.path ||
-                         data.filename ||
-                         data.url;
-        
+
+        const imagePath =
+          data.image ||
+          data.data?.image ||
+          data.imagePath ||
+          data.data?.imagePath ||
+          data.path ||
+          data.data?.path ||
+          data.filename ||
+          data.url;
+
         if (imagePath) {
           console.log('Image uploaded successfully, path:', imagePath);
-          // Return the path as-is, frontend will handle the full URL construction
           return imagePath;
+        } else {
+          throw new Error('No image path received from server');
         }
       } else {
         const errorText = await response.text();
         console.log('Upload failed:', {
           status: response.status,
           statusText: response.statusText,
-          error: errorText.substring(0, 300)
+          error: errorText.substring(0, 300),
         });
-        
-        // If it's HTML error page, throw meaningful error
+
         if (errorText.includes('<!DOCTYPE')) {
           throw new Error('Server configuration error - returned HTML instead of JSON');
         }
-        
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+
+        throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
       }
     } catch (error) {
       console.error('Error uploading image:', error);
-      
-      // For development: create a mock path that follows the same pattern
-      console.log('Using mock path for development...');
       const timestamp = Date.now();
       const fileName = compressedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
       return `/uploads/mock_${timestamp}_${fileName}`;
     }
   };
 
-  // Compress image function
   const compressImage = async (file: File): Promise<File> => {
     return new Promise((resolve) => {
+      const img = new window.Image() as HTMLImageElement;
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      const img = new Image();
-      
+
       img.onload = () => {
-        // Calculate new dimensions (max 800px width/height)
         const maxSize = 800;
         let { width, height } = img;
-        
+
         if (width > maxSize || height > maxSize) {
           if (width > height) {
             height = (height * maxSize) / width;
@@ -180,32 +176,33 @@ export default function AdminCRUDPage() {
             height = maxSize;
           }
         }
-        
+
         canvas.width = width;
         canvas.height = height;
-        
-        // Draw and compress
-        ctx?.drawImage(img, 0, 0, width, height);
-        
+
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+        }
+
         canvas.toBlob(
           (blob) => {
             if (blob) {
               const compressedFile = new File([blob], file.name, {
-                type: 'image/jpeg', // Convert to JPEG for better compression
-                lastModified: Date.now()
+                type: 'image/jpeg',
+                lastModified: Date.now(),
               });
               console.log(`Image compressed: ${file.size} → ${compressedFile.size} bytes`);
               resolve(compressedFile);
             } else {
-              resolve(file); // Fallback to original if compression fails
+              resolve(file);
             }
           },
           'image/jpeg',
-          0.7 // 70% quality
+          0.7
         );
       };
-      
-      img.onerror = () => resolve(file); // Fallback to original
+
+      img.onerror = () => resolve(file);
       img.src = URL.createObjectURL(file);
     });
   };
@@ -219,21 +216,21 @@ export default function AdminCRUDPage() {
         { key: 'price', label: 'Price', type: 'number' },
         { key: 'description', label: 'Description', type: 'textarea' },
         { key: 'stock', label: 'Stock', type: 'number' },
-        { key: 'inventoryId', label: 'Inventory', type: 'select', options: inventories }
+        { key: 'inventoryId', label: 'Inventory', type: 'select', options: inventories },
       ],
       displayFields: ['image', 'name', 'price', 'stock', 'inventory'],
       data: products,
-      setData: setProducts
+      setData: setProducts,
     },
     inventory: {
       title: 'Inventory',
       fields: [
         { key: 'name', label: 'Name', type: 'text' },
-        { key: 'description', label: 'Description', type: 'textarea' }
+        { key: 'description', label: 'Description', type: 'textarea' },
       ],
       displayFields: ['name', 'description'],
       data: inventories,
-      setData: setInventories
+      setData: setInventories,
     },
     invoices: {
       title: 'Invoices',
@@ -242,17 +239,22 @@ export default function AdminCRUDPage() {
         { key: 'productId', label: 'Product ID', type: 'text' },
         { key: 'quantity', label: 'Quantity', type: 'number' },
         { key: 'total', label: 'Total', type: 'number' },
-        { key: 'status', label: 'Status', type: 'select', options: [
-          { id: 'pending', name: 'Pending' },
-          { id: 'completed', name: 'Completed' },
-          { id: 'cancelled', name: 'Cancelled' }
-        ]},
-        { key: 'createdAt', label: 'Created At', type: 'date' }
+        {
+          key: 'status',
+          label: 'Status',
+          type: 'select',
+          options: [
+            { id: 'pending', name: 'Pending' },
+            { id: 'completed', name: 'Completed' },
+            { id: 'cancelled', name: 'Cancelled' },
+          ],
+        },
+        { key: 'createdAt', label: 'Created At', type: 'date' },
       ],
       displayFields: ['userId', 'productId', 'quantity', 'total', 'status'],
       data: invoices,
-      setData: setInvoices
-    }
+      setData: setInvoices,
+    },
   };
 
   const currentConfig = tabConfig[activeTab];
@@ -262,32 +264,31 @@ export default function AdminCRUDPage() {
     try {
       const endpoint = activeTab === 'invoices' ? 'invoice' : activeTab;
       const url = `https://api-mern-simpleecommerce.idkoding.com/api/${endpoint}`;
-      
-      // Untuk products, pastikan data sesuai dengan yang diharapkan backend
+
       let dataToSend = { ...formData };
-      
+
       if (activeTab === 'products') {
-        // Pastikan inventoryId ada dan valid
         if (!dataToSend.inventoryId) {
           alert('Please select an inventory');
+          setLoading(false);
           return;
         }
-        
-        // Jika tidak ada image, berikan default atau hapus field
-        if (!dataToSend.image) {
-          dataToSend.image = null;
-        }
-        
-        // Pastikan tipe data sesuai
+
+        dataToSend.inventory = {
+          connect: { id: dataToSend.inventoryId },
+        };
+        delete dataToSend.inventoryId;
+
+        dataToSend.image = dataToSend.image || null;
         dataToSend.price = Number(dataToSend.price);
         dataToSend.stock = Number(dataToSend.stock);
       }
-      
-      console.log('Sending data:', dataToSend);
-      
+
+      console.log('Sending data to API:', JSON.stringify(dataToSend, null, 2));
+
       let response;
       if (editingItem?.id) {
-        // Update existing
+        console.log('Updating product with ID:', editingItem.id);
         response = await fetch(`${url}/${editingItem.id}`, {
           method: 'PUT',
           headers: {
@@ -297,7 +298,7 @@ export default function AdminCRUDPage() {
           body: JSON.stringify(dataToSend),
         });
       } else {
-        // Create new
+        console.log('Creating new product');
         response = await fetch(url, {
           method: 'POST',
           headers: {
@@ -310,30 +311,27 @@ export default function AdminCRUDPage() {
 
       console.log('Save response status:', response.status);
       console.log('Save response headers:', Object.fromEntries(response.headers.entries()));
-      
-      // Check if response is JSON
+
       const contentType = response.headers.get('content-type');
       let result;
-      
+
       if (contentType && contentType.includes('application/json')) {
         result = await response.json();
       } else {
         const textResult = await response.text();
         console.log('Received non-JSON response:', textResult.substring(0, 200));
-        
         if (textResult.includes('<!DOCTYPE')) {
           throw new Error('Server returned HTML page instead of JSON. Check server configuration.');
         }
-        
         result = { message: textResult };
       }
-      
+
       console.log('Save response data:', result);
-      
+
       if (response.ok) {
         setEditingItem(null);
         setShowForm(false);
-        await fetchAll(); // Refresh data
+        await fetchAll();
         alert('Data saved successfully!');
       } else {
         console.error('Error saving data:', result);
@@ -362,7 +360,7 @@ export default function AdminCRUDPage() {
         );
 
         if (response.ok) {
-          await fetchAll(); // Refresh data
+          await fetchAll();
           alert('Data deleted successfully!');
         } else {
           const result = await response.json();
@@ -390,27 +388,26 @@ export default function AdminCRUDPage() {
 
   const formatValue = (value: any, field: string, item?: any) => {
     if (field === 'price' || field === 'total') {
-      return new Intl.NumberFormat('id-ID', { 
-        style: 'currency', 
+      return new Intl.NumberFormat('id-ID', {
+        style: 'currency',
         currency: 'IDR',
-        minimumFractionDigits: 0
+        minimumFractionDigits: 0,
       }).format(value);
     }
-    
+
     if (field === 'image' && value) {
-      // Clean the image path similar to ProductCard
       const cleanedImage = value.replace('http://127.0.0.1:5025', '');
-      const imageUrl = cleanedImage.startsWith('/') 
+      const imageUrl = cleanedImage.startsWith('/')
         ? `https://api-mern-simpleecommerce.idkoding.com${cleanedImage}`
-        : cleanedImage.startsWith('data:') 
-        ? cleanedImage  // base64 image
+        : cleanedImage.startsWith('data:')
+        ? cleanedImage
         : `https://api-mern-simpleecommerce.idkoding.com/uploads/${cleanedImage}`;
-      
+
       return (
         <div className="flex items-center space-x-2">
-          <Image 
-            src={imageUrl} 
-            alt="Product" 
+          <Image
+            src={imageUrl}
+            alt="Product"
             width={48}
             height={48}
             className="object-cover rounded cursor-pointer hover:opacity-80"
@@ -420,8 +417,8 @@ export default function AdminCRUDPage() {
             }}
             onError={(e) => {
               console.log('Image load error:', imageUrl);
-              // Fallback to placeholder
-              e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA0OCA0OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0yNCAzNkMzMC42Mjc0IDM2IDM2IDMwLjYyNzQgMzYgMjRDMzYgMTcuMzcyNiAzMC42Mjc0IDEyIDI0IDEyQzE3LjM3MjYgMTIgMTIgMTcuMzcyNiAxMiAyNEMxMiAzMC42Mjc0IDE3LjM3MjYgMzYgMjQgMzYiIGZpbGw9IiM5Q0EzQUYiLz4KPC9zdmc+';
+              e.currentTarget.src =
+                'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA0OCA0OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0yNCAzNkMzMC42Mjc0IDM2IDM2IDMwLjYyNzQgMzYgMjRDMzYgMTcuMzcyNiAzMC42Mjc0IDEyIDI0IDEyQzE3LjM3MjYgMTIgMTIgMTcuMzcyNiAxMiAyNEMxMiAzMC42Mjc0IDE3LjM3MjYgMzYgMjQgMzYiIGZpbGw9IiM5Q0EzQUYiLz4KPC9zdmc+';
             }}
           />
           <button
@@ -436,22 +433,19 @@ export default function AdminCRUDPage() {
         </div>
       );
     }
-    
+
     if (field === 'inventory' && item?.inventory) {
       return item.inventory.name;
     }
-    
+
     return value;
   };
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Admin Dashboard</h1>
-          
-          {/* Tabs */}
           <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
             {Object.entries(tabConfig).map(([key, config]) => (
               <button
@@ -473,9 +467,7 @@ export default function AdminCRUDPage() {
           </div>
         </div>
 
-        {/* Content */}
         <div className="bg-white rounded-lg shadow-sm">
-          {/* Header with Add Button */}
           <div className="flex justify-between items-center p-6 border-b">
             <h2 className="text-xl font-semibold text-gray-900">
               Manage {currentConfig.title}
@@ -490,7 +482,6 @@ export default function AdminCRUDPage() {
             </button>
           </div>
 
-          {/* Form Modal */}
           {showForm && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
@@ -508,7 +499,7 @@ export default function AdminCRUDPage() {
                     <X size={20} />
                   </button>
                 </div>
-                
+
                 <EntityForm
                   fields={currentConfig.fields}
                   initialData={editingItem}
@@ -523,7 +514,6 @@ export default function AdminCRUDPage() {
             </div>
           )}
 
-          {/* Image Modal */}
           {showImageModal && (
             <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
               <div className="relative max-w-4xl max-h-full">
@@ -533,22 +523,22 @@ export default function AdminCRUDPage() {
                 >
                   <X size={24} />
                 </button>
-                <Image 
-                  src={selectedImage} 
-                  alt="Product Preview" 
+                <Image
+                  src={selectedImage}
+                  alt="Product Preview"
                   width={800}
                   height={600}
                   className="max-w-full max-h-full object-contain rounded-lg"
                   onError={(e) => {
                     console.log('Modal image load error:', selectedImage);
-                    e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAwIiBoZWlnaHQ9IjYwMCIgdmlld0JveD0iMCAwIDgwMCA2MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI4MDAiIGhlaWdodD0iNjAwIiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjQwMCIgeT0iMzAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOUNBM0FGIiBmb250LXNpemU9IjI0Ij5JbWFnZSBub3QgZm91bmQ8L3RleHQ+Cjwvc3ZnPg==';
+                    e.currentTarget.src =
+                      'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAwIiBoZWlnaHQ9IjYwMCIgdmlld0JveD0iMCAwIDgwMCA2MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI4MDAiIGhlaWdodD0iNjAwIiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjQwMCIgeT0iMzAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOUNBM0FGIiBmb250LXNpemU9IjI0Ij5JbWFnZSBub3QgZm91bmQ8L3RleHQ+Cjwvc3ZnPg==';
                   }}
                 />
               </div>
             </div>
           )}
 
-          {/* Table */}
           <div className="overflow-x-auto">
             {loading ? (
               <div className="flex justify-center items-center py-12">
@@ -561,9 +551,12 @@ export default function AdminCRUDPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       ID
                     </th>
-                    {currentConfig.displayFields.map(field => (
-                      <th key={field} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                    {currentConfig.displayFields.map((field) => (
+                      <th
+                        key={field}
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        {field.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase())}
                       </th>
                     ))}
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -577,7 +570,7 @@ export default function AdminCRUDPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {item.id?.substring(0, 8)}...
                       </td>
-                      {currentConfig.displayFields.map(field => (
+                      {currentConfig.displayFields.map((field) => (
                         <td key={field} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {formatValue(item[field], field, item)}
                         </td>
@@ -619,8 +612,13 @@ export default function AdminCRUDPage() {
   );
 }
 
-// Form Component
-function EntityForm({ fields, initialData, onSave, onCancel, uploadImage }: {
+function EntityForm({
+  fields,
+  initialData,
+  onSave,
+  onCancel,
+  uploadImage,
+}: {
   fields: any[];
   initialData: any;
   onSave: (data: any) => void;
@@ -629,19 +627,39 @@ function EntityForm({ fields, initialData, onSave, onCancel, uploadImage }: {
 }) {
   const [formData, setFormData] = useState(() => {
     const initial: Record<string, any> = {};
-    fields.forEach(field => {
+    fields.forEach((field) => {
       initial[field.key] = initialData?.[field.key] || '';
     });
     return initial;
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [imagePreview, setImagePreview] = useState(initialData?.image || '');
-  const [uploadingImage, setUploadingImage] = useState(false);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      await onSave(formData);
+      let dataToSend = { ...formData };
+
+      // Handle image upload if a new file is selected
+      if (selectedImageFile) {
+        console.log('Starting image upload process...');
+        const imagePath = await uploadImage(selectedImageFile);
+        if (imagePath) {
+          dataToSend.image = imagePath;
+          const fullImageUrl = imagePath.startsWith('/')
+            ? `https://api-mern-simpleecommerce.idkoding.com${imagePath}`
+            : imagePath;
+          console.log('Image upload completed successfully, path:', fullImageUrl);
+        } else {
+          throw new Error('No image URL received');
+        }
+      }
+
+      await onSave(dataToSend);
+    } catch (error) {
+      console.error('Error during form submission:', error);
+      alert('Failed to save data. Please check console for details.');
     } finally {
       setIsSubmitting(false);
     }
@@ -651,41 +669,33 @@ function EntityForm({ fields, initialData, onSave, onCancel, uploadImage }: {
     setFormData((prev: Record<string, any>) => ({ ...prev, [key]: value }));
   };
 
-  const handleImageUpload = async (file: File) => {
-    if (!file) return;
-    
-    // Validate file type
+  const handleImageChange = (file: File | null) => {
+    if (!file) {
+      setSelectedImageFile(null);
+      setImagePreview('');
+      handleInputChange('image', '');
+      if (imagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(imagePreview);
+      }
+      return;
+    }
+
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
       alert('Please select a valid image file (JPEG, PNG, GIF, or WebP)');
       return;
     }
-    
-    // Validate file size (max 5MB)
+
     const maxSize = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
       alert('File size must be less than 5MB');
       return;
     }
-    
-    setUploadingImage(true);
-    try {
-      console.log('Starting image upload process...');
-      const imageUrl = await uploadImage(file);
-      
-      if (imageUrl) {
-        setImagePreview(imageUrl);
-        handleInputChange('image', imageUrl);
-        console.log('Image upload completed successfully');
-      } else {
-        throw new Error('No image URL received');
-      }
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      alert('Failed to upload image. Please try again or check console for details.');
-    } finally {
-      setUploadingImage(false);
-    }
+
+    const localPreviewUrl = URL.createObjectURL(file);
+    setImagePreview(localPreviewUrl);
+    setSelectedImageFile(file);
+    // Note: We do not set formData.image here; it will be set after upload in handleSubmit
   };
 
   const renderField = (field: any) => {
@@ -708,7 +718,7 @@ function EntityForm({ fields, initialData, onSave, onCancel, uploadImage }: {
             ))}
           </select>
         );
-      
+
       case 'textarea':
         return (
           <textarea
@@ -720,60 +730,52 @@ function EntityForm({ fields, initialData, onSave, onCancel, uploadImage }: {
             required
           />
         );
-      
+
       case 'file':
         return (
           <div className="space-y-3">
             <div className="flex items-center justify-center w-full">
               <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  <Upload className={`w-8 h-8 mb-2 ${uploadingImage ? 'text-blue-500 animate-pulse' : 'text-gray-500'}`} />
+                  <Upload
+                    className={`w-8 h-8 mb-2 ${selectedImageFile ? 'text-blue-500' : 'text-gray-500'}`}
+                  />
                   <p className="text-sm text-gray-500">
-                    {uploadingImage ? 'Uploading image...' : 'Click to upload image or drag and drop'}
+                    {selectedImageFile ? selectedImageFile.name : 'Click to upload image or drag and drop'}
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    PNG, JPG, GIF, WebP up to 5MB
-                  </p>
+                  <p className="text-xs text-gray-400 mt-1">PNG, JPG, GIF, WebP up to 5MB</p>
                 </div>
                 <input
                   type="file"
                   accept="image/*"
                   onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      handleImageUpload(file);
-                    }
+                    const file = e.target.files?.[0] || null;
+                    handleImageChange(file);
                   }}
-                  disabled={isSubmitting || uploadingImage}
+                  disabled={isSubmitting}
                   className="hidden"
                 />
               </label>
             </div>
             {imagePreview && (
               <div className="mt-3 relative">
-                <Image 
-                  src={imagePreview.startsWith('/') 
-                    ? `https://api-mern-simpleecommerce.idkoding.com${imagePreview}`
-                    : imagePreview
-                  } 
-                  alt="Preview" 
+                <Image
+                  src={imagePreview}
+                  alt="Preview"
                   width={200}
                   height={128}
                   className="w-full h-32 object-cover rounded-md border"
                   onError={(e) => {
                     console.log('Preview image error:', imagePreview);
-                    // Show placeholder if image fails to load
-                    e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEyOCIgdmlld0JveD0iMCAwIDIwMCAxMjgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTI4IiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjEwMCIgeT0iNjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM5Q0EzQUYiIGZvbnQtc2l6ZT0iMTIiPkltYWdlIFByZXZpZXc8L3RleHQ+Cjwvc3ZnPg==';
+                    e.currentTarget.src =
+                      'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEyOCIgdmlld0JveD0iMCAwIDIwMCAxMjgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTI4IiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjEwMCIgeT0iNjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM5Q0EzQUYiIGZvbnQtc2l6ZT0iMTIiPkltYWdlIFByZXZpZXc8L3RleHQ+Cjwvc3ZnPg==';
                   }}
                 />
                 <button
                   type="button"
-                  onClick={() => {
-                    setImagePreview('');
-                    handleInputChange('image', '');
-                  }}
+                  onClick={() => handleImageChange(null)}
                   className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
-                  disabled={isSubmitting || uploadingImage}
+                  disabled={isSubmitting}
                 >
                   <X size={14} />
                 </button>
@@ -781,7 +783,7 @@ function EntityForm({ fields, initialData, onSave, onCancel, uploadImage }: {
             )}
           </div>
         );
-      
+
       default:
         return (
           <input
@@ -801,15 +803,13 @@ function EntityForm({ fields, initialData, onSave, onCancel, uploadImage }: {
 
   return (
     <div className="space-y-4">
-      {fields.map(field => (
+      {fields.map((field) => (
         <div key={field.key}>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            {field.label}
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">{field.label}</label>
           {renderField(field)}
         </div>
       ))}
-      
+
       <div className="flex justify-end space-x-3 pt-4">
         <button
           type="button"
@@ -822,7 +822,7 @@ function EntityForm({ fields, initialData, onSave, onCancel, uploadImage }: {
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={isSubmitting || uploadingImage}
+          disabled={isSubmitting}
           className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Save size={16} />
