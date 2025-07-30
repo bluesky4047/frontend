@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
+import { Adamina } from 'next/font/google';
 
 // Interface untuk tipe data user
 interface UserData {
@@ -92,6 +93,11 @@ export default function Navbar() {
             <Link href="/invoices" className="flex items-center space-x-1 text-gray-700 hover:text-blue-600 transition-colors">
               <Receipt className="h-4 w-4" />
               <span>Invoices</span>
+            </Link>
+
+            <Link href="/admin" className="flex items-center space-x-1 text-gray-700 hover:text-blue-600 transition-colors">
+              <User className="h-4 w-4" />
+              <span>Admin</span>
             </Link>
 
             {/* User/Login/Logout - Perbaikan kondisional rendering */}

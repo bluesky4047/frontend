@@ -14,12 +14,13 @@ import { Search } from 'lucide-react';
 
 export default function Home() {
   const [products, setProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
   const [inventories, setInventories] = useState([]);
   const [selectedInventory, setSelectedInventory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // Ambil data inventory dari API
+  // Ambil data inventory
   useEffect(() => {
     const fetchInventories = async () => {
       try {
@@ -32,19 +33,13 @@ export default function Home() {
     fetchInventories();
   }, []);
 
-  // Ambil produk dari API dengan filter
-  const fetchProducts = async (inventoryId = 'all', search = '') => {
+  // Ambil semua produk lalu simpan sebagai allProducts
+  const fetchProducts = async () => {
     try {
       setLoading(true);
-      let endpoint = '/products';
-
-      const queryParams: string[] = [];
-      if (inventoryId !== 'all') queryParams.push(`inventory_id=${inventoryId}`);
-      if (search) queryParams.push(`search=${encodeURIComponent(search)}`);
-      if (queryParams.length) endpoint += `?${queryParams.join('&')}`;
-
-      const res = await api.get(endpoint);
-      setProducts(res.data.data);
+      const res = await api.get('/products');
+      const data = res.data.data;
+      setAllProducts(data);
     } catch (err) {
       console.error('Gagal mengambil produk:', err);
     } finally {
@@ -52,22 +47,38 @@ export default function Home() {
     }
   };
 
-  // Initial Load
+  // Load awal
   useEffect(() => {
     fetchProducts();
   }, []);
 
-  // Handle perubahan filter
+  // Lakukan filter dan search di frontend
+  useEffect(() => {
+    let filtered = [...allProducts];
+
+    if (selectedInventory !== 'all') {
+      filtered = filtered.filter(
+        (item: any) => item.inventory_id === selectedInventory
+      );
+    }
+
+    if (searchTerm.trim() !== '') {
+      filtered = filtered.filter(
+        (item: any) =>
+          item.nama_produk?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.deskripsi_barang?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    setProducts(filtered);
+  }, [allProducts, selectedInventory, searchTerm]);
+
   const handleInventoryChange = (value: string) => {
     setSelectedInventory(value);
-    fetchProducts(value, searchTerm);
   };
 
-  // Handle perubahan search
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const keyword = e.target.value;
-    setSearchTerm(keyword);
-    fetchProducts(selectedInventory, keyword);
+    setSearchTerm(e.target.value);
   };
 
   return (
@@ -99,7 +110,7 @@ export default function Home() {
             <SelectContent>
               <SelectItem value="all">All Inventories</SelectItem>
               {inventories.map((inv: any) => (
-                <SelectItem key={inv._id || inv.id} value={inv._id || inv.id}>
+                <SelectItem key={inv.id} value={inv.id}>
                   {inv.name}
                 </SelectItem>
               ))}
@@ -115,7 +126,7 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {products.length > 0 ? (
             products.map((product: any) => (
-              <ProductCard key={product._id || product.id} product={product} />
+              <ProductCard key={product.id} product={product} />
             ))
           ) : (
             <div className="text-center col-span-full text-gray-400">
