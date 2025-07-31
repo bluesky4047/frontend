@@ -274,11 +274,6 @@ export default function AdminCRUDPage() {
           return;
         }
 
-        dataToSend.inventory = {
-          connect: { id: dataToSend.inventoryId },
-        };
-        delete dataToSend.inventoryId;
-
         dataToSend.image = dataToSend.image || null;
         dataToSend.price = Number(dataToSend.price);
         dataToSend.stock = Number(dataToSend.stock);
