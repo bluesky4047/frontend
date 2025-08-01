@@ -83,130 +83,6 @@ export default function AdminCRUDPage() {
     }
   }, [token, fetchAll]);
 
-  useEffect(() => {
-    console.log('Inventories:', inventories);
-  }, [inventories]);
-
-  const uploadImage = async (file: File): Promise<string> => {
-    const compressedFile = await compressImage(file);
-
-    const formData = new FormData();
-    formData.append('image', compressedFile);
-
-    console.log('Uploading compressed file:', {
-      name: compressedFile.name,
-      size: compressedFile.size,
-      type: compressedFile.type,
-      originalSize: file.size,
-    });
-
-    try {
-      const uploadEndpoint = 'https://api-mern-simpleecommerce.idkoding.com/api/upload';
-      const response = await fetch(uploadEndpoint, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      console.log('Upload response status:', response.status);
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-
-      const contentType = response.headers.get('content-type');
-
-      if (response.ok && contentType && contentType.includes('application/json')) {
-        const data = await response.json();
-        console.log('Upload successful, response data:', data);
-
-        const imagePath =
-          data.image ||
-          data.data?.image ||
-          data.imagePath ||
-          data.data?.imagePath ||
-          data.path ||
-          data.data?.path ||
-          data.filename ||
-          data.url;
-
-        if (imagePath) {
-          console.log('Image uploaded successfully, path:', imagePath);
-          return imagePath;
-        } else {
-          throw new Error('No image path received from server');
-        }
-      } else {
-        const errorText = await response.text();
-        console.log('Upload failed:', {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorText.substring(0, 300),
-        });
-
-        if (errorText.includes('<!DOCTYPE')) {
-          throw new Error('Server configuration error - returned HTML instead of JSON');
-        }
-
-        throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
-      }
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      const timestamp = Date.now();
-      const fileName = compressedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-      return `/uploads/mock_${timestamp}_${fileName}`;
-    }
-  };
-
-  const compressImage = async (file: File): Promise<File> => {
-    return new Promise((resolve) => {
-      const img = new window.Image() as HTMLImageElement;
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-
-      img.onload = () => {
-        const maxSize = 800;
-        let { width, height } = img;
-
-        if (width > maxSize || height > maxSize) {
-          if (width > height) {
-            height = (height * maxSize) / width;
-            width = maxSize;
-          } else {
-            width = (width * maxSize) / height;
-            height = maxSize;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-        }
-
-        canvas.toBlob(
-          (blob) => {
-            if (blob) {
-              const compressedFile = new File([blob], file.name, {
-                type: 'image/jpeg',
-                lastModified: Date.now(),
-              });
-              console.log(`Image compressed: ${file.size} → ${compressedFile.size} bytes`);
-              resolve(compressedFile);
-            } else {
-              resolve(file);
-            }
-          },
-          'image/jpeg',
-          0.7
-        );
-      };
-
-      img.onerror = () => resolve(file);
-      img.src = URL.createObjectURL(file);
-    });
-  };
-
   const tabConfig = {
     products: {
       title: 'Products',
@@ -259,49 +135,92 @@ export default function AdminCRUDPage() {
 
   const currentConfig = tabConfig[activeTab];
 
-  const handleSave = async (formData: any) => {
+  const handleSave = async (formData: any, imageFile?: File) => {
     setLoading(true);
     try {
       const endpoint = activeTab === 'invoices' ? 'invoice' : activeTab;
       const url = `https://api-mern-simpleecommerce.idkoding.com/api/${endpoint}`;
 
-      let dataToSend = { ...formData };
+      let response;
 
       if (activeTab === 'products') {
-        if (!dataToSend.inventoryId) {
+        // Validate required fields for products
+        if (!formData.inventoryId) {
           alert('Please select an inventory');
           setLoading(false);
           return;
         }
 
-        dataToSend.image = dataToSend.image || null;
-        dataToSend.price = Number(dataToSend.price);
-        dataToSend.stock = Number(dataToSend.stock);
-      }
+        // Use FormData for products to handle file uploads
+        const formDataToSend = new FormData();
+        
+        // Add all form fields to FormData
+        formDataToSend.append('name', formData.name || '');
+        formDataToSend.append('price', String(Number(formData.price) || 0));
+        formDataToSend.append('description', formData.description || '');
+        formDataToSend.append('stock', String(Number(formData.stock) || 0));
+        formDataToSend.append('inventoryId', formData.inventoryId || '');
+        
+        // Add image file if provided
+        if (imageFile) {
+          formDataToSend.append('image', imageFile);
+        }
 
-      console.log('Sending data to API:', JSON.stringify(dataToSend, null, 2));
-
-      let response;
-      if (editingItem?.id) {
-        console.log('Updating product with ID:', editingItem.id);
-        response = await fetch(`${url}/${editingItem.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(dataToSend),
+        console.log('Sending FormData for product:', {
+          name: formData.name,
+          price: formData.price,
+          description: formData.description,
+          stock: formData.stock,
+          inventoryId: formData.inventoryId,
+          hasImage: !!imageFile
         });
+
+        if (editingItem?.id) {
+          console.log('Updating product with ID:', editingItem.id);
+          response = await fetch(`${url}/${editingItem.id}`, {
+            method: 'PUT',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              // Don't set Content-Type for FormData - let browser set it with boundary
+            },
+            body: formDataToSend,
+          });
+        } else {
+          console.log('Creating new product');
+          response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              // Don't set Content-Type for FormData - let browser set it with boundary
+            },
+            body: formDataToSend,
+          });
+        }
       } else {
-        console.log('Creating new product');
-        response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(dataToSend),
-        });
+        // For non-product entities, use JSON
+        let dataToSend = { ...formData };
+
+        console.log('Sending JSON data:', JSON.stringify(dataToSend, null, 2));
+
+        if (editingItem?.id) {
+          response = await fetch(`${url}/${editingItem.id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(dataToSend),
+          });
+        } else {
+          response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(dataToSend),
+          });
+        }
       }
 
       console.log('Save response status:', response.status);
@@ -310,15 +229,31 @@ export default function AdminCRUDPage() {
       const contentType = response.headers.get('content-type');
       let result;
 
-      if (contentType && contentType.includes('application/json')) {
-        result = await response.json();
-      } else {
-        const textResult = await response.text();
-        console.log('Received non-JSON response:', textResult.substring(0, 200));
-        if (textResult.includes('<!DOCTYPE')) {
-          throw new Error('Server returned HTML page instead of JSON. Check server configuration.');
+      try {
+        if (contentType && contentType.includes('application/json')) {
+          result = await response.json();
+        } else {
+          const textResult = await response.text();
+          console.log('Received non-JSON response:', textResult.substring(0, 500));
+          
+          if (textResult.includes('<!DOCTYPE')) {
+            throw new Error('Server returned HTML page instead of JSON. Check server configuration.');
+          }
+          
+          // Try to parse as JSON if it looks like JSON
+          if (textResult.trim().startsWith('{') || textResult.trim().startsWith('[')) {
+            try {
+              result = JSON.parse(textResult);
+            } catch {
+              result = { message: textResult };
+            }
+          } else {
+            result = { message: textResult };
+          }
         }
-        result = { message: textResult };
+      } catch (parseError) {
+        console.error('Error parsing response:', parseError);
+        result = { message: 'Failed to parse server response', error: parseError };
       }
 
       console.log('Save response data:', result);
@@ -330,11 +265,11 @@ export default function AdminCRUDPage() {
         alert('Data saved successfully!');
       } else {
         console.error('Error saving data:', result);
-        const errorMessage = result.message || result.error || `HTTP ${response.status}: ${response.statusText}`;
+        const errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
         alert(`Error: ${errorMessage}`);
       }
     } catch (error) {
-      console.error('Error saving data:', error);
+      console.error('Network error saving data:', error);
       alert(`Network error occurred while saving data: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
@@ -503,7 +438,6 @@ export default function AdminCRUDPage() {
                     setShowForm(false);
                     setEditingItem(null);
                   }}
-                  uploadImage={uploadImage}
                 />
               </div>
             </div>
@@ -612,13 +546,11 @@ function EntityForm({
   initialData,
   onSave,
   onCancel,
-  uploadImage,
 }: {
   fields: any[];
   initialData: any;
-  onSave: (data: any) => void;
+  onSave: (data: any, imageFile?: File) => void;
   onCancel: () => void;
-  uploadImage: (file: File) => Promise<string>;
 }) {
   const [formData, setFormData] = useState(() => {
     const initial: Record<string, any> = {};
@@ -634,24 +566,7 @@ function EntityForm({
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      let dataToSend = { ...formData };
-
-      // Handle image upload if a new file is selected
-      if (selectedImageFile) {
-        console.log('Starting image upload process...');
-        const imagePath = await uploadImage(selectedImageFile);
-        if (imagePath) {
-          dataToSend.image = imagePath;
-          const fullImageUrl = imagePath.startsWith('/')
-            ? `https://api-mern-simpleecommerce.idkoding.com${imagePath}`
-            : imagePath;
-          console.log('Image upload completed successfully, path:', fullImageUrl);
-        } else {
-          throw new Error('No image URL received');
-        }
-      }
-
-      await onSave(dataToSend);
+      await onSave(formData, selectedImageFile || undefined);
     } catch (error) {
       console.error('Error during form submission:', error);
       alert('Failed to save data. Please check console for details.');
@@ -669,7 +584,7 @@ function EntityForm({
       setSelectedImageFile(null);
       setImagePreview('');
       handleInputChange('image', '');
-      if (imagePreview.startsWith('blob:')) {
+      if (imagePreview && imagePreview.startsWith('blob:')) {
         URL.revokeObjectURL(imagePreview);
       }
       return;
@@ -690,7 +605,6 @@ function EntityForm({
     const localPreviewUrl = URL.createObjectURL(file);
     setImagePreview(localPreviewUrl);
     setSelectedImageFile(file);
-    // Note: We do not set formData.image here; it will be set after upload in handleSubmit
   };
 
   const renderField = (field: any) => {

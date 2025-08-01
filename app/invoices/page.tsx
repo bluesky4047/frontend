@@ -41,17 +41,20 @@ export default function InvoicesPage() {
 
   const filteredInvoices = invoices.filter(invoice =>
     invoice.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    invoice.name.toLowerCase().includes(searchTerm.toLowerCase())
+    invoice.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    invoice.email.toLowerCase().includes(searchTerm.toLowerCase()) 
+
   );
 
   const formatPrice = (price: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(price);
 
   const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString('id-ID', {
-      year: 'numeric', month: 'long', day: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    });
+  new Date(dateString).toLocaleString('id-ID', {
+    year: 'numeric', month: 'long', day: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
+
 
   return (
     <div className="space-y-6">
@@ -63,7 +66,7 @@ export default function InvoicesPage() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
         <Input
-          placeholder="Search by invoice ID or Name"
+          placeholder="Search by invoice ID or Name or Gmail"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-10"
